@@ -1,0 +1,98 @@
+openapi: 3.0.1
+paths:
+  '/classify/triangle':
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriangleSide'
+      responses:
+        '200':
+          description: 200 response
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+            Content-Type: application/json
+          content:
+            application/json:
+              schema:
+                '$ref': '#/components/schemas/APIResponse'
+
+      security:
+        - ApiKeyAuth: []
+      x-amazon-apigateway-integration:
+        credentials: '${api_gateway_execution_role}'
+        uri: '${lambda_invoke_arn}'
+        responses:
+          default:
+            statusCode: '200'
+            responseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+
+        passthroughBehavior: when_no_match
+        httpMethod: POST
+        contentHandling: CONVERT_TO_TEXT
+        type: aws
+  /requests:
+    get:
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
+      responses:
+        "200":
+          description: "200 response"
+          headers:
+            Access-Control-Allow-Origin:
+              type: "string"
+      security:
+        - api_key: []
+      x-amazon-apigateway-integration:
+        credentials: "${api_gateway_execution_role}"
+        httpMethod: "POST"
+        uri: "${dynamo_action}"
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            responseTemplates:
+              application/json: "#set($inputRoot = $input.path('$'))      \n \
+                            \     [                                        \n \
+                             \      #foreach($elem in $inputRoot.Items){    \n \
+                              \      \"id\":\"$elem.requestKey.S\",          \n \
+                               \      \"request\": $elem.request.M.toString(),           \n \
+                               \      \"response\": $elem.response.M.toString()          \n \
+                                 \     }#if($foreach.hasNext),#end               \n \
+                                  \   #end                                        \n \
+                                   \ ]"
+        requestTemplates:
+          application/json: "{\"TableName\": \"${table_name}\" }"
+        passthroughBehavior: "when_no_match"
+        timeoutInMillis: 29000
+        type: "aws"
+components:
+  schemas:
+    Empty:
+      title: Empty Schema
+      type: object
+    APIResponse:
+      type: object
+      properties:
+        type:
+          type: string
+    TriangleSide:
+      firstSide:
+        type: Integer
+      secondSide:
+        type: Integer
+      thirdSide:
+        type: Integer
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      name: x-api-key
+      in: header
